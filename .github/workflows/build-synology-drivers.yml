@@ -40,8 +40,11 @@ jobs:
           mkdir -p output
           cp /tmp/ec20-modules/{option.ko,usb_wwan.ko} output/
           for module in output/*.ko; do
-            modinfo "$module"
-            modprobe --dump-modversions "$module"
+            modinfo "$module"            ; if grep -q '^CONFIG_MODVERSIONS=y' "$KDIR/.config"; then
+              modprobe --dump-modversions "$module"
+            else
+              echo 'CONFIG_MODVERSIONS is disabled in the official kernel configuration.'
+            fi
           done | tee output/build-info.txt
           sha256sum output/*.ko > output/SHA256SUMS
           cp "$KDIR/.config" output/kernel.config
