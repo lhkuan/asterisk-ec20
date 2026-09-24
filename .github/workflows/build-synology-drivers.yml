@@ -1,0 +1,54 @@
+name: Build Synology EC20 drivers
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/build-synology-drivers.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    container: debian:bookworm
+    steps:
+      - name: Install build tools
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates curl git make gcc binutils bc bison flex libssl-dev libelf-dev kmod xz-utils
+      - name: Download official DSM 7.4 r1000 development files
+        run: |
+          curl -fL --retry 3 -o /tmp/dsm.txz https://global.synologydownload.com/download/ToolChain/toolkit/7.4/r1000/ds.r1000-7.4.dev.txz
+          echo '7267fb1144fe95b7a9a7da999693139e  /tmp/dsm.txz' | md5sum -c -
+          mkdir -p /tmp/dsm
+          tar -xJf /tmp/dsm.txz -C /tmp/dsm usr/local/x86_64-pc-linux-gnu/x86_64-pc-linux-gnu/sys-root/usr/lib/modules/DSM-7.4/build
+      - name: Build Quectel serial modules
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone https://github.com/QuecPython/Quectel_Linux_USB_Serial_Option_Driver.git /tmp/quectel
+          git -C /tmp/quectel checkout d88d2ca8479cad7b41b7f65ed19d74df29fa874a
+          mkdir -p /tmp/ec20-modules
+          cp /tmp/quectel/src/v4.4.111/drivers/usb/serial/{option.c,usb_wwan.c,usb-wwan.h} /tmp/ec20-modules/
+          printf 'obj-m := option.o usb_wwan.o\n' > /tmp/ec20-modules/Makefile
+          KDIR=/tmp/dsm/usr/local/x86_64-pc-linux-gnu/x86_64-pc-linux-gnu/sys-root/usr/lib/modules/DSM-7.4/build
+          cat "$KDIR/include/generated/utsrelease.h"
+          grep -q '"4.4.302+"' "$KDIR/include/generated/utsrelease.h"
+          make -C "$KDIR" M=/tmp/ec20-modules ARCH=x86 CROSS_COMPILE= CC=gcc HOSTCC=gcc LD=ld modules
+          mkdir -p output
+          cp /tmp/ec20-modules/{option.ko,usb_wwan.ko} output/
+          for module in output/*.ko; do
+            modinfo "$module"
+            modprobe --dump-modversions "$module"
+          done | tee output/build-info.txt
+          sha256sum output/*.ko > output/SHA256SUMS
+          cp "$KDIR/.config" output/kernel.config
+          printf '%s\n' 'Built from QuecPython commit d88d2ca8479cad7b41b7f65ed19d74df29fa874a, src/v4.4.111.' 'Kernel headers: official Synology DSM 7.4 r1000 development package.' 'Not yet tested on hardware. Compare vermagic and module symbol versions with the running NAS before loading. Never force module loading.' > output/README.txt
+      - name: Upload modules and compatibility information
+        uses: actions/upload-artifact@v4
+        with:
+          name: ec20-synology-r1000-dsm7.4
+          path: output/
+          if-no-files-found: error
