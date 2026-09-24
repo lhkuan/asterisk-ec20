@@ -30,7 +30,7 @@ RUN git init . \
     && git checkout --detach FETCH_HEAD \
     && test "$(git rev-parse HEAD)" = "${QUECTEL_REF}" \
     && ./bootstrap \
-    && ./configure --with-astversion="${ASTERISK_VERSION}" --with-asterisk=/usr/include DESTDIR=/usr/lib/asterisk/modules \
+    && ./configure --with-astversion="${ASTERISK_VERSION}" --with-asterisk=/usr/src/asterisk/include DESTDIR=/usr/lib/asterisk/modules \
     && make -j"$(nproc)" && make install
 
 FROM debian:trixie-slim AS runtime
