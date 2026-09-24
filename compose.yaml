@@ -1,0 +1,47 @@
+services:
+  asterisk-ec20:
+    image: ghcr.io/lhkuan/asterisk-ec20:${IMAGE_TAG:-22.11.0}
+    container_name: asterisk-ec20
+    restart: unless-stopped
+    network_mode: host
+    user: "${ASTERISK_UID:-1000}:${ASTERISK_GID:-1000}"
+    group_add:
+      - "${SERIAL_GID:?Set SERIAL_GID in .env to the host serial device group}"
+      - "${AUDIO_GID:?Set AUDIO_GID in .env to the host sound device group}"
+    environment:
+      TZ: Asia/Shanghai
+    devices:
+      - "${EC20_AT_DEVICE:-/dev/ttyUSB2}:/dev/ttyUSB2"
+      - /dev/snd:/dev/snd
+    volumes:
+      - type: bind
+        source: ./config/pjsip.conf
+        target: /etc/asterisk/pjsip.conf
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./config/extensions.conf
+        target: /etc/asterisk/extensions.conf
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./config/quectel.conf
+        target: /etc/asterisk/quectel.conf
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./config/rtp.conf
+        target: /etc/asterisk/rtp.conf
+        read_only: true
+        bind:
+          create_host_path: false
+      - asterisk-data:/var/lib/asterisk
+      - asterisk-spool:/var/spool/asterisk
+      - asterisk-logs:/var/log/asterisk
+volumes:
+  asterisk-data:
+  asterisk-spool:
+  asterisk-logs:
