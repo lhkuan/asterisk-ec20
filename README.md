@@ -9,9 +9,9 @@ Asterisk 22.11.0 + `biaide/asterisk-chan-quectel`，用于 Linux / 群晖的 EC2
 - 首先推送 `ghcr.io/lhkuan/asterisk-ec20:sha-<完整提交 SHA>`。
 - 检查远端 manifest 包含两种架构，并分别启动容器验证 `chan_quectel.so` 能加载；通过后，main 分支才更新 `latest` 和 `22.11.0`。
 - `v*` 标签触发构建及检查，保留对应 SHA 镜像，不覆盖 main 的发布标签。
-- 驱动固定为提交 `005f74f11a8bac5102e17a6d092136f20336f4db`；基础镜像固定为多架构 digest，避免上游标签漂移。
+- 驱动固定为提交 `005f74f11a8bac5102e17a6d092136f20336f4db`；Asterisk 源码包固定 SHA256，避免源码漂移。
 
-基础镜像使用 `ghcr.io/andrius/asterisk:22.11.0_debian-trixie-dev`。核查时同版本非 dev 标签返回 404，所以编译与运行使用相同的 dev 基础镜像，以保持二进制兼容。代价是镜像包含基础镜像自带的开发工具，体积较大。以后替换运行镜像时必须重新验证版本、依赖和模块加载。
+从官方 Asterisk 22.11.0 源码构建，校验 SHA256；驱动使用同一次构建安装的头文件。编译阶段与运行阶段均为 Debian Trixie，运行镜像不包含编译工具。禁用 BUILD_NATIVE，避免镜像依赖构建机器的 CPU 特性。amd64 与 arm64 使用各自原生 GitHub runner 编译并验证。
 
 CI 不连接 EC20 硬件，也不会拨打电话。镜像构建与模块加载通过不等于蜂窝网络、SIP 注册或双向语音已经验收。
 
@@ -39,7 +39,7 @@ EC20_AT_DEVICE=/dev/ttyUSB2
 IMAGE_TAG=22.11.0
 ```
 
-Compose 默认以基础镜像的 Asterisk 用户 UID/GID 1000:1000 运行，并添加宿主机设备组。如果有既有数据卷，确保其所有者与运行 UID/GID 一致。不要仅修改 UID 而不修正数据卷权限。
+Compose 默认以镜像中的 Asterisk 用户 UID/GID 1000:1000 运行，并添加宿主机设备组。如果有既有数据卷，确保其所有者与运行 UID/GID 一致。不要仅修改 UID 而不修正数据卷权限。
 
 ## Asterisk 配置
 
